@@ -35,6 +35,6 @@ for i in range(train_data.shape[1]):
         # Create density map
         density_map0 = calc_density(i, j, train0, resolution)
         density_map1 = calc_density(i, j, train1, resolution)
-        plt.imshow((density_map1 / density_map0), origin='lower')
+        plt.imshow((density_map1 - density_map0), origin='lower')
         plt.title('%d, %d' % (i, j))
     plt.show()
