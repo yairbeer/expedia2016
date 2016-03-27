@@ -1,4 +1,4 @@
-import xgboost
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.grid_search import ParameterGrid
 from sklearn.metrics import log_loss
 from functions import *
@@ -46,9 +46,7 @@ best_train = 0
 best_test = 0
 
 param_grid = [
-              {'silent': [1],
-               'nthread': [2],
-               'eval_metric': ['logloss'],
+              {'eval_metric': ['logloss'],
                'eta': [0.003],
                'objective': ['binary:logistic'],
                'max_depth': [6],
@@ -60,13 +58,13 @@ param_grid = [
                'test_rounds_fac': [1.2],
                'count_n': [0],
                'mc_test': [True],
-               'pca_n': [10]
+               'pca_n': [5]
                }
               ]
 
+lda = LinearDiscriminantAnalysis()
 print('start CV')
 early_stopping = 120
-mc_round_list = []
 mc_logloss_mean = []
 mc_logloss_sd = []
 params_list = []
@@ -79,18 +77,19 @@ for params in ParameterGrid(param_grid):
 
     pcaing = PCA(n_components=params['pca_n'])
 
-    train_pca = pcaing.fit_transform(train_raw)
-    test_pca = pcaing.transform(test_raw)
-    print(pcaing.explained_variance_ratio_)
+    # train_pca = pcaing.fit_transform(train_raw)
+    # test_pca = pcaing.transform(test_raw)
+    # print(pcaing.explained_variance_ratio_)
+    #
+    # train = np.hstack(tuple([train_raw, train_pca, train_m_features]))
+    # test = np.hstack(tuple([test_raw, test_pca, test_m_features]))
 
-    train = np.hstack(tuple([train_raw, train_pca, train_m_features]))
-    test = np.hstack(tuple([test_raw, test_pca, test_m_features]))
-
+    train = train_raw
+    test = test_raw
     print('There are %d columns' % train.shape[1])
 
     # CV
-    mc_auc = []
-    mc_round = []
+    mc_logloss = []
     mc_train_pred = []
     for i_mc in range(params['n_monte_carlo']):
         cv_n = params['cv_n']
@@ -102,71 +101,36 @@ for params in ParameterGrid(param_grid):
             X_train, X_test = train[cv_train_index, :], train[cv_test_index, :]
             y_train, y_test = target.iloc[cv_train_index].values, target.iloc[cv_test_index].values
 
-            # train machine learning
-            xg_train = xgboost.DMatrix(X_train, label=y_train)
-            xg_test = xgboost.DMatrix(X_test, label=y_test)
-
-            watchlist = [(xg_train, 'train'), (xg_test, 'test')]
-
-            num_round = params['num_round']
-            xgclassifier = xgboost.train(params, xg_train, num_round, watchlist, early_stopping_rounds=early_stopping);
-            xgboost_rounds.append(xgclassifier.best_iteration)
-
-        num_round = int(np.mean(xgboost_rounds))
-        print('The best n_rounds is %d' % num_round)
-
-        for cv_train_index, cv_test_index in kf:
-            X_train, X_test = train[cv_train_index, :], train[cv_test_index, :]
-            y_train, y_test = target.iloc[cv_train_index].values, target.iloc[cv_test_index].values
-
-            # train machine learning
-            xg_train = xgboost.DMatrix(X_train, label=y_train)
-            xg_test = xgboost.DMatrix(X_test, label=y_test)
-
-            watchlist = [(xg_train, 'train'), (xg_test, 'test')]
-
-            xgclassifier = xgboost.train(params, xg_train, num_round, watchlist);
+            lda.fit(X_train, y_train)
 
             # predict
-            predicted_results = xgclassifier.predict(xg_test)
+            predicted_results = lda.predict_proba(X_test)[:, 1]
             train_predictions[cv_test_index] = predicted_results
 
-        print('AUC score ', log_loss(target.values, train_predictions))
-        mc_auc.append(log_loss(target.values, train_predictions))
+        print('logloss score ', log_loss(target.values, train_predictions))
+        mc_logloss.append(log_loss(target.values, train_predictions))
         mc_train_pred.append(train_predictions)
-        mc_round.append(num_round)
 
     mc_train_pred = np.mean(np.array(mc_train_pred), axis=0)
 
-    mc_round_list.append(int(np.mean(mc_round)))
-    mc_logloss_mean.append(np.mean(mc_auc))
-    mc_logloss_sd.append(np.std(mc_auc))
-    print('The AUC range is: %.5f to %.5f and best n_round: %d' %
-          (mc_logloss_mean[-1] - mc_logloss_sd[-1], mc_logloss_mean[-1] + mc_logloss_sd[-1], mc_round_list[-1]))
-    print_results.append('The AUC range is: %.5f to %.5f and best n_round: %d' %
-                         (mc_logloss_mean[-1] - mc_logloss_sd[-1], mc_logloss_mean[-1] + mc_logloss_sd[-1], mc_round_list[-1]))
-    print('For ', mc_auc)
+    mc_logloss_mean.append(np.mean(mc_logloss))
+    mc_logloss_sd.append(np.std(mc_logloss))
+    print('The Logloss range is: %.5f to %.5f' %
+          (mc_logloss_mean[-1] - mc_logloss_sd[-1], mc_logloss_mean[-1] + mc_logloss_sd[-1]))
+    print_results.append('The AUC range is: %.5f to %.5f' %
+                         (mc_logloss_mean[-1] - mc_logloss_sd[-1], mc_logloss_mean[-1] + mc_logloss_sd[-1]))
+    print('For ', mc_logloss)
     print('The AUC of the average prediction is: %.5f' % log_loss(target.values, mc_train_pred))
     meta_solvers_train.append(mc_train_pred)
 
-    # train machine learning
-    xg_train = xgboost.DMatrix(train, label=target.values)
-    xg_test = xgboost.DMatrix(test)
-
     if params['mc_test']:
-        watchlist = [(xg_train, 'train')]
 
-        num_round = int(mc_round_list[-1] * params['test_rounds_fac'])
         mc_pred = []
         for i_mc in range(params['n_monte_carlo']):
             params['seed'] = i_mc
-            xg_train = xgboost.DMatrix(train, label=target.values)
-            xg_test = xgboost.DMatrix(test)
 
-            watchlist = [(xg_train, 'train')]
-
-            xgclassifier = xgboost.train(params, xg_train, num_round, watchlist);
-            mc_pred.append(xgclassifier.predict(xg_test))
+            lda.fit(train, target.values)
+            mc_pred.append(lda.predict_proba(test)[:, 1])
 
         meta_solvers_test.append(np.mean(np.array(mc_pred), axis=0))
 
@@ -192,14 +156,10 @@ Final Solution
 if best_params['mc_test']:
     print('writing to file')
     print(best_prediction)
-    pd.DataFrame(best_train_prediction).to_csv('train_xgboost_d6_pca10_int_m.csv')
+    pd.DataFrame(best_train_prediction).to_csv('train_lda.csv')
     test_results['probability'] = best_prediction
-    test_results.to_csv("test_xgboost_d6_pca10_fac12_int_m.csv")
+    test_results.to_csv("test_lda.csv")
 
 """ n_monte_carlo = 5, CV = 5 """
-# raw dataset:
-# add pca n=10: 0.691508312789/ 0.69145
-# add pca subsample 0.5: 0.69109878841440509/ 0.6915
-# add pca subsample 0.75 depth6: 0.69110658645667622/ 0.69151
-# add pca subsample 0.75 depth6 + kernel pca for 5000: nope
-# raw dataset + PCA n=10 + m_interactions: 0./ 0.
+# raw dataset: 0.6915/ 0.
+
