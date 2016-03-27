@@ -12,6 +12,10 @@ def calc_density(feature_i, feature_j, arr, res):
                                     arr[:, feature_i] < ((step_i + 1) * step))
             cond_j = np.logical_and(arr[:, feature_j] >= (step_j * step),
                                     arr[:, feature_j] < ((step_j + 1) * step))
+            if (step_i + 1) * step == 1:
+                cond_i = np.logical_or(cond_i, arr[:, feature_i] == 1)
+            if (step_j + 1) * step == 1:
+                cond_j = np.logical_or(cond_j, arr[:, feature_j] == 1)
             density[step_i, step_j] = np.sum(np.logical_and(cond_i, cond_j))
     density /= np.sum(density)
     return density
@@ -26,7 +30,7 @@ train0 = train_data[train_target == 0, :]
 train1 = train_data[train_target == 1, :]
 
 # For each interaction
-resolution = 30
+resolution = 50
 n_rows = int(np.sqrt(train_data.shape[1]))
 for i in range(train_data.shape[1]):
     plt.figure(1)
