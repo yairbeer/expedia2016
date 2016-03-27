@@ -26,6 +26,13 @@ print(test_results)
 print(train_raw.shape)
 print(test_raw.shape)
 
+inter_m = [[0, 7], [2, 17], [3, 13], [6, 8], [6, 11], [7, 18], [9, 10], [9, 20], [10, 20], [12, 14], [14, 15], [16, 19]]
+train_m_features = np.zeros((train_raw.shape[0], len(inter_m)))
+test_m_features = np.zeros((test_raw.shape[0], len(inter_m)))
+for i, int_features in enumerate(inter_m):
+    train_m_features[:, i] = train_raw[:, int_features[0]] - train_raw[:, int_features[1]]
+    test_m_features[:, i] = test_raw[:, int_features[0]] - test_raw[:, int_features[1]]
+
 """
 CV
 """
@@ -76,8 +83,8 @@ for params in ParameterGrid(param_grid):
     test_pca = pcaing.transform(test_raw)
     print(pcaing.explained_variance_ratio_)
 
-    train = np.hstack(tuple([train_raw, train_pca]))
-    test = np.hstack(tuple([test_raw, test_pca]))
+    train = np.hstack(tuple([train_raw, train_pca, train_m_features]))
+    test = np.hstack(tuple([test_raw, test_pca, test_m_features]))
 
     print('There are %d columns' % train.shape[1])
 
@@ -185,13 +192,14 @@ Final Solution
 if best_params['mc_test']:
     print('writing to file')
     print(best_prediction)
-    pd.DataFrame(best_train_prediction).to_csv('xgboost_d6_pca10_train_opt.csv')
+    pd.DataFrame(best_train_prediction).to_csv('train_xgboost_d6_pca10_int_m.csv')
     test_results['probability'] = best_prediction
-    test_results.to_csv("xgboost_d6_pca10_fac12_opt.csv")
+    test_results.to_csv("test_xgboost_d6_pca10_fac12_int_m.csv")
 
 """ n_monte_carlo = 5, CV = 5 """
 # raw dataset:
 # add pca n=10: 0.691508312789/ 0.69145
 # add pca subsample 0.5: 0.69109878841440509/ 0.6915
 # add pca subsample 0.75 depth6: 0.69110658645667622/ 0.69151
-# add pca subsample 0.75 depth6 + kernel pca for 5000: 0./ 0.
+# add pca subsample 0.75 depth6 + kernel pca for 5000: nope
+# add pca subsample 0.75 depth6 + m_interactions: 0.69110658645667622/ 0.69151

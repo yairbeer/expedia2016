@@ -29,6 +29,11 @@ print(train_raw)
 print(test_raw)
 
 inter_m = [[0, 7], [2, 17], [3, 13], [6, 8], [6, 11], [7, 18], [9, 10], [9, 20], [10, 20], [12, 14], [14, 15], [16, 19]]
+train_m_features = np.zeros((train_raw.shape[0], len(inter_m)))
+test_m_features = np.zeros((test_raw.shape[0], len(inter_m)))
+for i, int_features in enumerate(inter_m):
+    train_m_features[:, i] = train_raw[:, int_features[0]] - train_raw[:, int_features[1]]
+    test_m_features[:, i] = test_raw[:, int_features[0]] - test_raw[:, int_features[1]]
 
 """
 CV
@@ -77,8 +82,8 @@ for params in ParameterGrid(param_grid):
     test_pca = pcaing.transform(test_raw)
     print(pcaing.explained_variance_ratio_)
 
-    train = np.hstack(tuple([train_raw, train_pca]))
-    test = np.hstack(tuple([test_raw, test_pca]))
+    train = np.hstack(tuple([train_raw, train_pca, train_m_features]))
+    test = np.hstack(tuple([test_raw, test_pca, test_m_features]))
 
     print('There are %d columns' % train.shape[1])
 
