@@ -79,8 +79,8 @@ for params in ParameterGrid(param_grid):
     # train = np.hstack(tuple([train_raw, train_pca, train_m_features]))
     # test = np.hstack(tuple([test_raw, test_pca, test_m_features]))
 
-    train = train_raw
-    test = test_raw
+    train = train_pca[:, :3]
+    test = test_pca[:, :3]
 
     print('There are %d columns' % train.shape[1])
 
@@ -150,9 +150,9 @@ Final Solution
 if best_params['mc_test']:
     print('writing to file')
     print(best_prediction)
-    pd.DataFrame(best_train_prediction).to_csv('train_svc_gini.csv')
+    pd.DataFrame(best_train_prediction).to_csv('train_svc_pca3.csv')
     test_results['probability'] = best_prediction
-    test_results.to_csv("test_svc_gini.csv")
+    test_results.to_csv("test_svc_pca3.csv")
 
 """ n_monte_carlo = 5, CV = 5 """
 # raw dataset: 0./ 0.

@@ -3,16 +3,12 @@ from sklearn.grid_search import ParameterGrid
 from sklearn.metrics import log_loss
 from functions import *
 from sklearn.decomposition import PCA
-from keras.models import Sequential
-from keras.layers.core import Dense, Activation, Dropout
-from keras.optimizers import SGD
 
 target_col = 'target'
 
 """ Load data and change into used format"""
 print('Load data')
 train_raw = pd.read_csv("numerai_training_data.csv")
-train_result_dum = np.array(pd.get_dummies(train_raw['target']))
 target = train_raw[target_col]
 print(target.value_counts(normalize=True))
 train_raw = np.array(train_raw.drop(target_col, axis=1))
@@ -56,12 +52,7 @@ param_grid = [
                'test_rounds_fac': [1.2],
                'mc_test': [True],
                'pca_n': [5],
-               'layer_n': [100, 200, 400],
-               'dropout': [0.5],
-               'batch': [32],
-               'n_epoch': [50],
-               'decay': [1e-6],
-               'momentum': [0.9]
+               'n_neighbors': [50, 60, 70]
                }
               ]
 
@@ -91,42 +82,22 @@ for params in ParameterGrid(param_grid):
 
     print('There are %d columns' % train.shape[1])
 
-    batch = params['batch']
-    n_epoch = params['n_epoch']
-
-    model = Sequential()
-    # Dense(64) is a fully-connected layer with 64 hidden units.
-    # in the first layer, you must specify the expected input data shape:
-    model.add(Dense(params['layer_n'], init='uniform', input_dim=train.shape[1]))
-    model.add(Activation('tanh'))
-    model.add(Dropout(params['dropout']))
-    model.add(Dense(params['layer_n'], init='uniform'))
-    model.add(Activation('tanh'))
-    model.add(Dropout(params['dropout']))
-    model.add(Dense(params['layer_n'], init='uniform'))
-    model.add(Activation('tanh'))
-    model.add(Dropout(params['dropout']))
-    model.add(Dense(2, init='uniform'))
-    model.add(Activation('softmax'))
-
-    sgd = SGD(lr=0.003, decay=params['decay'], momentum=params['momentum'], nesterov=True)
-    model.compile(loss='binary_crossentropy', optimizer=sgd)
-
     # CV
     mc_logloss = []
     mc_train_pred = []
     for i_mc in range(params['n_monte_carlo']):
+        classifier = KNeighborsClassifier(n_neighbors=params['n_neighbors'])
         cv_n = params['cv_n']
         kf = StratifiedKFold(target.values, n_folds=cv_n, shuffle=True, random_state=i_mc ** 3)
 
         for cv_train_index, cv_test_index in kf:
             X_train, X_test = train[cv_train_index, :], train[cv_test_index, :]
-            y_train, y_test = train_result_dum[cv_train_index, :], train_result_dum[cv_test_index, :]
+            y_train, y_test = target.iloc[cv_train_index].values, target.iloc[cv_test_index].values
 
-            model.fit(X_train, y_train, nb_epoch=n_epoch, batch_size=batch, verbose=1, validation_split=0.1)
+            classifier.fit(X_train, y_train)
 
             # predict
-            predicted_results = model.predict(X_test, batch_size=batch, verbose=1)[:, 1]
+            predicted_results = classifier.predict_proba(X_test)[:, 1]
             train_predictions[cv_test_index] = predicted_results
 
         print('logloss score ', log_loss(target.values, train_predictions))
@@ -149,8 +120,9 @@ for params in ParameterGrid(param_grid):
 
         mc_pred = []
         for i_mc in range(params['n_monte_carlo']):
-            model.fit(train, train_result_dum, nb_epoch=n_epoch, batch_size=batch, verbose=1)
-            mc_pred.append(model.predict(test, batch_size=batch, verbose=1)[:, 1])
+            classifier = KNeighborsClassifier(n_neighbors=params['n_neighbors'])
+            classifier.fit(train, target.values)
+            mc_pred.append(classifier.predict_proba(test)[:, 1])
 
         meta_solvers_test.append(np.mean(np.array(mc_pred), axis=0))
 
@@ -176,9 +148,9 @@ Final Solution
 if best_params['mc_test']:
     print('writing to file')
     print(best_prediction)
-    pd.DataFrame(best_train_prediction).to_csv('train_nn.csv')
+    pd.DataFrame(best_train_prediction).to_csv('train_knn_l2.csv')
     test_results['probability'] = best_prediction
-    test_results.to_csv("test_nn.csv")
+    test_results.to_csv("test_knn_l2.csv")
 
 """ n_monte_carlo = 5, CV = 5 """
 # raw dataset: 0./ 0.

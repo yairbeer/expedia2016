@@ -29,8 +29,18 @@ train_data = np.array(train_data)
 train0 = train_data[train_target == 0, :]
 train1 = train_data[train_target == 1, :]
 
+# For each feature
+n_rows = int(np.sqrt(train_data.shape[1]))
+plt.figure(1)
+for i in range(train_data.shape[1]):
+    plt.subplot(train_data.shape[1] / n_rows, n_rows, i)
+    # Create density map
+    plt.hist([train0[:, i], train1[:, i]], normed=True)
+    plt.title('%d' % i)
+plt.show()
+
 # For each interaction
-resolution = 50
+resolution = 30
 n_rows = int(np.sqrt(train_data.shape[1]))
 for i in range(train_data.shape[1]):
     plt.figure(1)
@@ -41,4 +51,5 @@ for i in range(train_data.shape[1]):
         density_map1 = calc_density(i, j, train1, resolution)
         plt.imshow((density_map1 - density_map0), origin='lower')
         plt.title('%d, %d' % (i, j))
+        plt.colorbar(ticks=[-0.001, 0, 0.001])
     plt.show()
