@@ -1,4 +1,4 @@
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
 from sklearn.grid_search import ParameterGrid
 from sklearn.metrics import log_loss
 from functions import *
@@ -76,8 +76,11 @@ for params in ParameterGrid(param_grid):
     test_pca = pcaing.transform(test_raw)
     print(pcaing.explained_variance_ratio_)
 
-    train = np.hstack(tuple([train_raw, train_pca, train_m_features]))
-    test = np.hstack(tuple([test_raw, test_pca, test_m_features]))
+    # train = np.hstack(tuple([train_raw, train_pca, train_m_features]))
+    # test = np.hstack(tuple([test_raw, test_pca, test_m_features]))
+
+    train = train_raw
+    test = test_raw
 
     print('There are %d columns' % train.shape[1])
 
@@ -85,8 +88,7 @@ for params in ParameterGrid(param_grid):
     mc_logloss = []
     mc_train_pred = []
     for i_mc in range(params['n_monte_carlo']):
-        classifier = RandomForestClassifier(n_estimators=params['n_estimators'], max_depth=params['max_depth'],
-                                            max_features=params['max_features'], random_state=i_mc ** 3)
+        classifier = SVC(kernel='rbf', random_state=i_mc ** 3, probability=True)
         cv_n = params['cv_n']
         kf = StratifiedKFold(target.values, n_folds=cv_n, shuffle=True, random_state=i_mc ** 3)
 
@@ -120,8 +122,7 @@ for params in ParameterGrid(param_grid):
 
         mc_pred = []
         for i_mc in range(params['n_monte_carlo']):
-            classifier = RandomForestClassifier(n_estimators=params['n_estimators'], max_depth=params['max_depth'],
-                                                max_features=params['max_features'], random_state=i_mc ** 3)
+            classifier = SVC(kernel='rbf', random_state=i_mc ** 3, probability=True)
             classifier.fit(train, target.values)
             mc_pred.append(classifier.predict_proba(test)[:, 1])
 
@@ -149,9 +150,9 @@ Final Solution
 if best_params['mc_test']:
     print('writing to file')
     print(best_prediction)
-    pd.DataFrame(best_train_prediction).to_csv('train_rf_gini.csv')
+    pd.DataFrame(best_train_prediction).to_csv('train_svc_gini.csv')
     test_results['probability'] = best_prediction
-    test_results.to_csv("test_rf_gini.csv")
+    test_results.to_csv("test_svc_gini.csv")
 
 """ n_monte_carlo = 5, CV = 5 """
 # raw dataset: 0./ 0.

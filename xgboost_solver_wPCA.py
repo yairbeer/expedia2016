@@ -202,4 +202,4 @@ if best_params['mc_test']:
 # add pca subsample 0.5: 0.69109878841440509/ 0.6915
 # add pca subsample 0.75 depth6: 0.69110658645667622/ 0.69151
 # add pca subsample 0.75 depth6 + kernel pca for 5000: nope
-# raw dataset + PCA n=10 + m_interactions: 0./ 0.
+# raw dataset + PCA n=10 + m_interactions: 0.690955319007/ 0.69141
