@@ -1,12 +1,7 @@
 import xgboost
 from sklearn.grid_search import ParameterGrid
-from sklearn.metrics import log_loss
 from functions import *
-from sklearn.decomposition import PCA
 from scipy.stats import ttest_ind
-from sklearn.preprocessing import PolynomialFeatures
-
-poly_transform = PolynomialFeatures(interaction_only=True)
 
 target_col = 'target'
 
@@ -30,20 +25,47 @@ print(train_raw.shape)
 print(test_raw.shape)
 
 # Get polynomial features
-train_poly = poly_transform.fit_transform(train_raw)[:, 1:]
-test_poly = poly_transform.transform(test_raw)[:, 1:]
-print(train_poly.shape, test_poly.shape)
+train_poly = np.zeros((train_raw.shape[0], int((train_raw.shape[1]) * (train_raw.shape[1] - 1) / 2 * 3)))
+test_poly = np.zeros((test_raw.shape[0], int((train_raw.shape[1]) * (train_raw.shape[1] - 1) / 2 * 3)))
+
+poly_col = 0
+# +
+for i in range(1, train_raw.shape[1]):
+    for j in range(i, train_raw.shape[1]):
+        train_poly[:, poly_col] = train_raw[:, i] + train_raw[:, j]
+        test_poly[:, poly_col] = test_raw[:, i] + test_raw[:, j]
+        poly_col += 1
+# -
+for i in range(1, train_raw.shape[1]):
+    for j in range(i, train_raw.shape[1]):
+        train_poly[:, poly_col] = train_raw[:, i] - train_raw[:, j]
+        test_poly[:, poly_col] = test_raw[:, i] - test_raw[:, j]
+        poly_col += 1
+# *
+for i in range(1, train_raw.shape[1]):
+    for j in range(i, train_raw.shape[1]):
+        train_poly[:, poly_col] = train_raw[:, i] * train_raw[:, j]
+        test_poly[:, poly_col] = test_raw[:, i] * test_raw[:, j]
+        poly_col += 1
+
+train_poly = np.hstack((train_raw, train_poly))
+test_poly = np.hstack((test_raw, test_poly))
 
 # t-test columns
 train0 = train_poly[target.values == 0, :]
 train1 = train_poly[target.values == 1, :]
 
-t_test_scores = []
+t_test_scores = np.zeros((train_poly.shape[1], 2))
 for col_i in range(train_poly.shape[1]):
-    t_test_scores.append(ttest_ind(train0[:, col_i], train1[:, col_i]))
-t_test_scores = np.array(t_test_scores)
+    t_test_scores[col_i] = (ttest_ind(train0[:, col_i], train1[:, col_i]))
+t_test_scores = np.array(t_test_scores)[:, 1]
 
-p_vals = np.log(t_test_scores[:, 1])
+print(train_poly.shape, t_test_scores.shape)
+train_poly = train_poly[:, ~np.isnan(t_test_scores)]
+test_poly = test_poly[:, ~np.isnan(t_test_scores)]
+t_test_scores = t_test_scores[~np.isnan(t_test_scores)]
+
+p_vals = np.log(t_test_scores)
 """
 CV
 """
@@ -58,9 +80,9 @@ best_test = 0
 
 param_grid = [
               {'silent': [1],
-               'nthread': [2],
+               'nthread': [3],
                'eval_metric': ['logloss'],
-               'eta': [0.003],
+               'eta': [0.01],
                'objective': ['binary:logistic'],
                'max_depth': [6],
                'num_round': [5000],
@@ -70,14 +92,14 @@ param_grid = [
                'cv_n': [5],
                'test_rounds_fac': [1.2],
                'count_n': [0],
-               'mc_test': [False],
+               'mc_test': [True],
                'pca_n': [10],
-               'p_thresh': [-10, -20, -30, -35]
+               'p_thresh': [-50, -40, -30, -20]
                }
               ]
 
 print('start CV')
-early_stopping = 120
+early_stopping = 60
 mc_round_list = []
 mc_logloss_mean = []
 mc_logloss_sd = []
@@ -90,7 +112,7 @@ for params in ParameterGrid(param_grid):
     print('There are %d columns' % train.shape[1])
 
     # CV
-    mc_auc = []
+    mc_log_loss = []
     mc_round = []
     mc_train_pred = []
     for i_mc in range(params['n_monte_carlo']):
@@ -133,22 +155,22 @@ for params in ParameterGrid(param_grid):
             predicted_results = xgclassifier.predict(xg_test)
             train_predictions[cv_test_index] = predicted_results
 
-        print('AUC score ', log_loss(target.values, train_predictions))
-        mc_auc.append(log_loss(target.values, train_predictions))
+        print('log_loss score ', log_loss(target.values, train_predictions))
+        mc_log_loss.append(log_loss(target.values, train_predictions))
         mc_train_pred.append(train_predictions)
         mc_round.append(num_round)
 
     mc_train_pred = np.mean(np.array(mc_train_pred), axis=0)
 
     mc_round_list.append(int(np.mean(mc_round)))
-    mc_logloss_mean.append(np.mean(mc_auc))
-    mc_logloss_sd.append(np.std(mc_auc))
-    print('The AUC range is: %.5f to %.5f and best n_round: %d' %
+    mc_logloss_mean.append(np.mean(mc_log_loss))
+    mc_logloss_sd.append(np.std(mc_log_loss))
+    print('The log_loss range is: %.5f to %.5f and best n_round: %d' %
           (mc_logloss_mean[-1] - mc_logloss_sd[-1], mc_logloss_mean[-1] + mc_logloss_sd[-1], mc_round_list[-1]))
-    print_results.append('The AUC range is: %.5f to %.5f and best n_round: %d' %
+    print_results.append('The log_loss range is: %.5f to %.5f and best n_round: %d' %
                          (mc_logloss_mean[-1] - mc_logloss_sd[-1], mc_logloss_mean[-1] + mc_logloss_sd[-1], mc_round_list[-1]))
-    print('For ', mc_auc)
-    print('The AUC of the average prediction is: %.5f' % log_loss(target.values, mc_train_pred))
+    print('For ', mc_log_loss)
+    print('The log_loss of the average prediction is: %.5f' % log_loss(target.values, mc_train_pred))
     meta_solvers_train.append(mc_train_pred)
 
     # train machine learning

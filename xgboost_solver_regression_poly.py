@@ -36,6 +36,9 @@ train_poly = poly_transform.fit_transform(train_raw)[:, 1:]
 test_poly = poly_transform.transform(test_raw)[:, 1:]
 print(train_poly.shape, test_poly.shape)
 
+train_poly = np.hstack((train_raw, train_poly))
+test_poly = np.hstack((test_raw, test_poly))
+
 # t-test columns
 train0 = train_poly[target.values == 0, :]
 train1 = train_poly[target.values == 1, :]
@@ -69,7 +72,7 @@ param_grid = [
                'n_monte_carlo': [5],
                'cv_n': [5],
                'test_rounds_fac': [1.2],
-               'mc_test': [False],
+               'mc_test': [True],
                'pca_n': [10],
                'p_thresh': [-35, -30, -20, -10, -5]
                }
