@@ -79,8 +79,8 @@ for params in ParameterGrid(param_grid):
     # train = np.hstack(tuple([train_raw, train_pca, train_m_features]))
     # test = np.hstack(tuple([test_raw, test_pca, test_m_features]))
 
-    train = train_pca[:, :3]
-    test = test_pca[:, :3]
+    train = train_pca
+    test = test_pca
 
     print('There are %d columns' % train.shape[1])
 
@@ -156,5 +156,6 @@ if best_params['mc_test']:
 
 """ n_monte_carlo = 5, CV = 5 """
 # raw dataset: 0./ 0.
-# add pca n=5: 0.691032433742/ 0.69118
+# add pca n=3: 0.691719622792/ 0.
+# add pca n=5: 0./ 0.
 

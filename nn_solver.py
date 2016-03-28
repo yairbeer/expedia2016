@@ -123,7 +123,7 @@ for params in ParameterGrid(param_grid):
             X_train, X_test = train[cv_train_index, :], train[cv_test_index, :]
             y_train, y_test = train_result_dum[cv_train_index, :], train_result_dum[cv_test_index, :]
 
-            model.fit(X_train, y_train, nb_epoch=n_epoch, batch_size=batch, verbose=1, validation_split=0.1)
+            model.fit(X_train, y_train, nb_epoch=n_epoch, batch_size=batch, verbose=1)
 
             # predict
             predicted_results = model.predict(X_test, batch_size=batch, verbose=1)[:, 1]
@@ -181,5 +181,5 @@ if best_params['mc_test']:
     test_results.to_csv("test_nn.csv")
 
 """ n_monte_carlo = 5, CV = 5 """
-# raw dataset: 0./ 0.
+# raw dataset: 0.691426523933/ 0.
 

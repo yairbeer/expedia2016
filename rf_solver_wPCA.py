@@ -47,7 +47,8 @@ best_test = 0
 
 param_grid = [
               {
-               'n_estimators': [200],
+               'n_estimators': [500],
+               'criterion': ['entropy', 'gini'],
                'max_depth': [6],
                'max_features': [0.2],
                'n_monte_carlo': [5],
@@ -86,7 +87,8 @@ for params in ParameterGrid(param_grid):
     mc_train_pred = []
     for i_mc in range(params['n_monte_carlo']):
         classifier = RandomForestClassifier(n_estimators=params['n_estimators'], max_depth=params['max_depth'],
-                                            max_features=params['max_features'], random_state=i_mc ** 3)
+                                            max_features=params['max_features'], random_state=i_mc ** 3,
+                                            criterion=params['criterion'])
         cv_n = params['cv_n']
         kf = StratifiedKFold(target.values, n_folds=cv_n, shuffle=True, random_state=i_mc ** 3)
 
@@ -121,11 +123,18 @@ for params in ParameterGrid(param_grid):
         mc_pred = []
         for i_mc in range(params['n_monte_carlo']):
             classifier = RandomForestClassifier(n_estimators=params['n_estimators'], max_depth=params['max_depth'],
-                                                max_features=params['max_features'], random_state=i_mc ** 3)
+                                                max_features=params['max_features'], random_state=i_mc ** 3,
+                                                criterion=params['criterion'])
             classifier.fit(train, target.values)
             mc_pred.append(classifier.predict_proba(test)[:, 1])
 
         meta_solvers_test.append(np.mean(np.array(mc_pred), axis=0))
+        """ Write opt solution """
+
+        print('writing to file')
+        pd.DataFrame(mc_train_pred).to_csv('train_rf_%s.csv' % params['criterion'])
+        test_results['probability'] = meta_solvers_test[-1]
+        test_results.to_csv("test_rf_%s.csv" % params['criterion'])
 
     if mc_logloss_mean[-1] < best_score:
         print('new best log loss')
@@ -134,7 +143,6 @@ for params in ParameterGrid(param_grid):
         best_train_prediction = mc_train_pred
         if params['mc_test']:
             best_prediction = meta_solvers_test[-1]
-
 print(best_score)
 print(best_params)
 
@@ -145,13 +153,7 @@ print(mc_logloss_sd)
 """
 Final Solution
 """
-""" Write opt solution """
-if best_params['mc_test']:
-    print('writing to file')
-    print(best_prediction)
-    pd.DataFrame(best_train_prediction).to_csv('train_rf_gini.csv')
-    test_results['probability'] = best_prediction
-    test_results.to_csv("test_rf_gini.csv")
+
 
 """ n_monte_carlo = 5, CV = 5 """
 # raw dataset: 0./ 0.
