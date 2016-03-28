@@ -2,7 +2,11 @@ import xgboost
 from sklearn.grid_search import ParameterGrid
 from sklearn.metrics import log_loss
 from functions import *
-from sklearn.decomposition import PCA, KernelPCA
+from sklearn.decomposition import PCA
+from scipy.stats import ttest_ind
+from sklearn.preprocessing import PolynomialFeatures
+
+poly_transform = PolynomialFeatures(interaction_only=True)
 
 target_col = 'target'
 
@@ -21,18 +25,25 @@ test_results['probability'] = np.zeros((test_raw.shape[0]))
 del test_results['t_id']
 del test_raw['t_id']
 test_raw = np.array(test_raw)
-print(test_results)
 
 print(train_raw.shape)
 print(test_raw.shape)
 
-inter_m = [[0, 7], [2, 17], [3, 13], [6, 8], [6, 11], [7, 18], [9, 10], [9, 20], [10, 20], [12, 14], [14, 15], [16, 19]]
-train_m_features = np.zeros((train_raw.shape[0], len(inter_m)))
-test_m_features = np.zeros((test_raw.shape[0], len(inter_m)))
-for i, int_features in enumerate(inter_m):
-    train_m_features[:, i] = train_raw[:, int_features[0]] - train_raw[:, int_features[1]]
-    test_m_features[:, i] = test_raw[:, int_features[0]] - test_raw[:, int_features[1]]
+# Get polynomial features
+train_poly = poly_transform.fit_transform(train_raw)[:, 1:]
+test_poly = poly_transform.transform(test_raw)[:, 1:]
+print(train_poly.shape, test_poly.shape)
 
+# t-test columns
+train0 = train_poly[target.values == 0, :]
+train1 = train_poly[target.values == 1, :]
+
+t_test_scores = []
+for col_i in range(train_poly.shape[1]):
+    t_test_scores.append(ttest_ind(train0[:, col_i], train1[:, col_i]))
+t_test_scores = np.array(t_test_scores)
+
+p_vals = np.log(t_test_scores[:, 1])
 """
 CV
 """
@@ -51,7 +62,7 @@ param_grid = [
                'eval_metric': ['logloss'],
                'eta': [0.003],
                'objective': ['binary:logistic'],
-               'max_depth': [4, 6, 8],
+               'max_depth': [6],
                'num_round': [5000],
                'subsample': [0.75],
                'metric_feature_lim': [0],
@@ -59,8 +70,9 @@ param_grid = [
                'cv_n': [5],
                'test_rounds_fac': [1.2],
                'count_n': [0],
-               'mc_test': [True],
-               'pca_n': [10]
+               'mc_test': [False],
+               'pca_n': [10],
+               'p_thresh': [-35, -30, -20, -10, -5]
                }
               ]
 
@@ -72,20 +84,9 @@ mc_logloss_sd = []
 params_list = []
 print_results = []
 for params in ParameterGrid(param_grid):
-    print(params)
-    params_list.append(params)
 
-    train_predictions = np.ones((train_raw.shape[0],))
-
-    pcaing = PCA(n_components=params['pca_n'])
-
-    train_pca = pcaing.fit_transform(train_raw)
-    test_pca = pcaing.transform(test_raw)
-    print(pcaing.explained_variance_ratio_)
-
-    train = np.hstack(tuple([train_raw, train_pca, train_m_features]))
-    test = np.hstack(tuple([test_raw, test_pca, test_m_features]))
-
+    train = train_poly[:, p_vals < params['p_thresh']]
+    test = test_poly[:, p_vals < params['p_thresh']]
     print('There are %d columns' % train.shape[1])
 
     # CV
@@ -97,6 +98,7 @@ for params in ParameterGrid(param_grid):
         kf = StratifiedKFold(target.values, n_folds=cv_n, shuffle=True, random_state=i_mc ** 3)
 
         xgboost_rounds = []
+        train_predictions = np.zeros((train.shape[0],))
 
         for cv_train_index, cv_test_index in kf:
             X_train, X_test = train[cv_train_index, :], train[cv_test_index, :]
@@ -172,9 +174,9 @@ for params in ParameterGrid(param_grid):
 
         """ Write opt solution """
         print('writing to file')
-        pd.DataFrame(mc_train_pred).to_csv('train_xgboost_d%d_pca10_int_m.csv' % params['max_depth'])
+        pd.DataFrame(mc_train_pred).to_csv('train_xgboost_d6_pca10_int_%d.csv' % params['p_thresh'])
         test_results['probability'] = meta_solvers_test[-1]
-        test_results.to_csv("test_xgboost_d%d_pca10_fac12_int_m.csv" % params['max_depth'])
+        test_results.to_csv("test_xgboost_d6_pca10_fac12_int_%d.csv" % params['p_thresh'])
 
     if mc_logloss_mean[-1] < best_score:
         print('new best log loss')
@@ -193,9 +195,4 @@ print(mc_logloss_mean)
 print(mc_logloss_sd)
 
 """ n_monte_carlo = 5, CV = 5 """
-# raw dataset:
-# add pca n=10: 0.691508312789/ 0.69145
-# add pca subsample 0.5: 0.69109878841440509/ 0.6915
-# add pca subsample 0.75 depth6: 0.69110658645667622/ 0.69151
-# add pca subsample 0.75 depth6 + kernel pca for 5000: nope
-# raw dataset + PCA n=10 + m_interactions: 0.690955319007/ 0.69141
+
