@@ -1,12 +1,14 @@
 import xgboost
 from sklearn.grid_search import ParameterGrid
 from sklearn.metrics import log_loss
+from sklearn.decomposition import PCA, KernelPCA
 from functions import *
-from sklearn.decomposition import PCA
 from scipy.stats import ttest_ind
 from sklearn.preprocessing import PolynomialFeatures
 
 poly_transform = PolynomialFeatures(interaction_only=True)
+
+pcaing = PCA(n_components=10)
 
 target_col = 'target'
 
@@ -26,8 +28,8 @@ del test_results['t_id']
 del test_raw['t_id']
 test_raw = np.array(test_raw)
 
-print(train_raw.shape)
-print(test_raw.shape)
+print(train_raw)
+print(test_raw)
 
 # Get polynomial features
 train_poly = poly_transform.fit_transform(train_raw)[:, 1:]
@@ -59,25 +61,22 @@ best_test = 0
 param_grid = [
               {'silent': [1],
                'nthread': [2],
+               'booster': ['gblinear'],
                'eval_metric': ['logloss'],
-               'eta': [0.003],
+               'eta': [0.01],
                'objective': ['binary:logistic'],
-               'max_depth': [6],
-               'num_round': [5000],
-               'subsample': [0.75],
-               'metric_feature_lim': [0],
+               'num_round': [8000],
                'n_monte_carlo': [5],
                'cv_n': [5],
                'test_rounds_fac': [1.2],
-               'count_n': [0],
                'mc_test': [False],
                'pca_n': [10],
-               'p_thresh': [-10, -20, -30, -35]
+               'p_thresh': [-35, -30, -20, -10, -5]
                }
               ]
 
 print('start CV')
-early_stopping = 120
+early_stopping = 200
 mc_round_list = []
 mc_logloss_mean = []
 mc_logloss_sd = []
@@ -174,9 +173,9 @@ for params in ParameterGrid(param_grid):
 
         """ Write opt solution """
         print('writing to file')
-        pd.DataFrame(mc_train_pred).to_csv('train_xgboost_d6_int_%d.csv' % params['p_thresh'])
+        pd.DataFrame(mc_train_pred).to_csv('train_xgboost_lin_int_%d.csv' % params['p_thresh'])
         test_results['probability'] = meta_solvers_test[-1]
-        test_results.to_csv("test_xgboost_d6_pca10_fac12_int_%d.csv" % params['p_thresh'])
+        test_results.to_csv("test_xgboost_lin_fac12_int_%d.csv" % params['p_thresh'])
 
     if mc_logloss_mean[-1] < best_score:
         print('new best log loss')
@@ -195,4 +194,6 @@ print(mc_logloss_mean)
 print(mc_logloss_sd)
 
 """ n_monte_carlo = 5, CV = 5 """
-
+# raw dataset + PCA n=10: 0.69152999790286596 / 0.69014
+# raw dataset + PCA n=10 + rbf kernel PCA n=10: nope
+# raw dataset + PCA n=10 + m_interactions: nope
