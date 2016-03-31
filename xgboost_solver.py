@@ -1,6 +1,5 @@
 import xgboost
 from sklearn.grid_search import ParameterGrid
-from sklearn.metrics import log_loss
 from functions import *
 
 target_col = 'target'
@@ -39,18 +38,21 @@ best_test = 0
 
 param_grid = [
               {'silent': [1],
-               'nthread': [2],
+               'nthread': [3],
                'eval_metric': ['logloss'],
-               'eta': [0.003],
+               'eta': [0.01],
                'objective': ['binary:logistic'],
                'max_depth': [6],
+               'min_child_weight': [1],
                'num_round': [2000],
+               'gamma': [5, 10, 15, 20],
                'subsample': [1],
-               'n_monte_carlo': [5],
+               'colsample_bytree': [1],
+               'n_monte_carlo': [3],
                'cv_n': [5],
                'test_rounds_fac': [1.2],
                'count_n': [0],
-               'mc_test': [True],
+               'mc_test': [False],
                'special_feng': [0]
                }
               ]
@@ -151,6 +153,11 @@ for params in ParameterGrid(param_grid):
             mc_pred.append(xgclassifier.predict(xg_test))
 
         meta_solvers_test.append(np.mean(np.array(mc_pred), axis=0))
+        """ Write opt solution """
+        print('writing to file')
+        pd.DataFrame(best_train_prediction).to_csv('results/train_xgboost_d6_opt.csv')
+        test_results['probability'] = best_prediction
+        test_results.to_csv("results/test_xgboost_d6_opt.csv")
 
     if mc_logloss_mean[-1] < best_score:
         print('new best log loss')
@@ -170,11 +177,5 @@ print(mc_logloss_sd)
 """
 Final Solution
 """
-""" Write opt solution """
-if best_params['mc_test']:
-    print('writing to file')
-    pd.DataFrame(best_train_prediction).to_csv('xgboost_d6_train_opt.csv')
-    test_results['probability'] = best_prediction
-    test_results.to_csv("xgboost_d6_fac12_opt.csv")
 
 # raw dataset: 0.6923
