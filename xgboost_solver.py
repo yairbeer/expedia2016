@@ -45,14 +45,14 @@ param_grid = [
                'max_depth': [6],
                'min_child_weight': [1],
                'num_round': [2000],
-               'gamma': [5, 10, 15, 20],
-               'subsample': [1],
-               'colsample_bytree': [1],
-               'n_monte_carlo': [3],
+               'gamma': [10],
+               'subsample': [0.5],
+               'colsample_bytree': [0.3],
+               'n_monte_carlo': [5],
                'cv_n': [5],
                'test_rounds_fac': [1.2],
                'count_n': [0],
-               'mc_test': [False],
+               'mc_test': [True],
                'special_feng': [0]
                }
               ]
@@ -155,8 +155,8 @@ for params in ParameterGrid(param_grid):
         meta_solvers_test.append(np.mean(np.array(mc_pred), axis=0))
         """ Write opt solution """
         print('writing to file')
-        pd.DataFrame(best_train_prediction).to_csv('results/train_xgboost_d6_opt.csv')
-        test_results['probability'] = best_prediction
+        pd.DataFrame(mc_train_pred).to_csv('results/train_xgboost_d6_opt.csv')
+        test_results['probability'] = meta_solvers_test[-1]
         test_results.to_csv("results/test_xgboost_d6_opt.csv")
 
     if mc_logloss_mean[-1] < best_score:

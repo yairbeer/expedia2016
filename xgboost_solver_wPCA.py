@@ -1,8 +1,7 @@
 import xgboost
 from sklearn.grid_search import ParameterGrid
-from sklearn.metrics import log_loss
 from functions import *
-from sklearn.decomposition import PCA, KernelPCA
+from sklearn.decomposition import PCA
 
 target_col = 'target'
 
@@ -47,20 +46,23 @@ best_test = 0
 
 param_grid = [
               {'silent': [1],
-               'nthread': [2],
+               'nthread': [3],
                'eval_metric': ['logloss'],
-               'eta': [0.003],
+               'eta': [0.01],
                'objective': ['binary:logistic'],
-               'max_depth': [4, 6, 8],
-               'num_round': [5000],
-               'subsample': [0.75],
-               'metric_feature_lim': [0],
+               'max_depth': [6],
+               'min_child_weight': [1],
+               'num_round': [2000],
+               'gamma': [10],
+               'subsample': [0.5],
+               'colsample_bytree': [0.3],
                'n_monte_carlo': [5],
                'cv_n': [5],
                'test_rounds_fac': [1.2],
                'count_n': [0],
                'mc_test': [True],
-               'pca_n': [10]
+               'special_feng': [0],
+               'pca_n': [1, 2, 3, 4, 5, 10]
                }
               ]
 
@@ -172,9 +174,9 @@ for params in ParameterGrid(param_grid):
 
         """ Write opt solution """
         print('writing to file')
-        pd.DataFrame(mc_train_pred).to_csv('train_xgboost_d%d_pca10_int_m.csv' % params['max_depth'])
+        pd.DataFrame(mc_train_pred).to_csv('results/train_xgboost_d6_pca%d.csv' % params['pca_n'])
         test_results['probability'] = meta_solvers_test[-1]
-        test_results.to_csv("test_xgboost_d%d_pca10_fac12_int_m.csv" % params['max_depth'])
+        test_results.to_csv("results/test_xgboost_pca%d.csv" % params['pca_n'])
 
     if mc_logloss_mean[-1] < best_score:
         print('new best log loss')
