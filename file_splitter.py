@@ -34,12 +34,12 @@ Variables
 # Sampling rate of the data
 samp = 100
 # Number of rows read
-n_rows = 1e8
+n_rows = 1e5
 # Whether to merge the data
 merge = False
 # sample_train filename, None if not required
 train_file = 'input/train_samp_%d_merged.csv' % samp
-classifier = RandomForestClassifier(n_estimators=100, max_depth=30, max_features=0.3)
+classifier = RandomForestClassifier(n_estimators=50, max_depth=15, max_features=0.3)
 
 """
 Read data
