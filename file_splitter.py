@@ -10,19 +10,19 @@ from sklearn.cross_validation import train_test_split
 
 def parse_dates(df):
     search_date = list(df['date_time'])
-    search_date = list(map(lambda x: datetime.datetime.strptime(x, '%Y-%m-%d %H:%M:%S'), search_date))
+    # search_date = list(map(lambda x: datetime.datetime.strptime(x, '%Y-%m-%d %H:%M:%S'), search_date))
     # df['search_weekday'] = list(map(lambda x: int(x.strftime('%w')), search_date))
     # df['search_month'] = list(map(lambda x: int(x.strftime('%m')), search_date))
     # df['search_monthday'] = list(map(lambda x: int(x.strftime('%d')), search_date))
     del df['date_time']
     chkin_date = list(df['srch_ci'])
-    chkin_date = list(map(lambda x: datetime.datetime.strptime(x, '%Y-%m-%d'), chkin_date))
+    # chkin_date = list(map(lambda x: datetime.datetime.strptime(x, '%Y-%m-%d'), chkin_date))
     # df['ci_weekday'] = list(map(lambda x: int(x.strftime('%w')), chkin_date))
     # df['ci_month'] = list(map(lambda x: int(x.strftime('%m')), chkin_date))
     # df['ci_monthday'] = list(map(lambda x: int(x.strftime('%d')), chkin_date))
     del df['srch_ci']
     chkout_date = list(df['srch_co'])
-    chkout_date = list(map(lambda x: datetime.datetime.strptime(x, '%Y-%m-%d'), chkout_date))
+    # chkout_date = list(map(lambda x: datetime.datetime.strptime(x, '%Y-%m-%d'), chkout_date))
     # df['co_weekday'] = list(map(lambda x: int(x.strftime('%w')), chkout_date))
     # df['co_month'] = list(map(lambda x: int(x.strftime('%m')), chkout_date))
     # df['co_monthday'] = list(map(lambda x: int(x.strftime('%d')), chkout_date))
@@ -41,7 +41,11 @@ def percent2mapk(predict_percent, k):
 
 
 def list2str(predict_list, join_by):
-    return predict_list
+    str_list = []
+    for predict_result in predict_list:
+        predict_result = list(map(lambda x: str(x), predict_result))
+        str_list.append(join_by.join(predict_result))
+    return str_list
 
 
 def y2list(y_array):
@@ -62,14 +66,13 @@ n_rows = 1e5
 merge = False
 # sample_train filename, None if not required
 train_file = 'input/train_samp_%d_merged.csv' % samp
-classifier = RandomForestClassifier(n_estimators=50, max_depth=15)
+classifier = RandomForestClassifier(n_estimators=5, max_depth=10, random_state=42)
 
 """
 Read data
 """
 # Read destinations
 destinations = pd.DataFrame.from_csv('input/destinations.csv')
-# print(destinations)
 
 # Read and sample train
 train_rows = 0
@@ -127,13 +130,15 @@ test[['date_time', 'srch_ci', 'srch_co']] = test[['date_time', 'srch_ci', 'srch_
 # Remove NaNs
 train_samp = train_samp.replace('', '9999')
 test = test.replace('', '9999')
+train_samp = train_samp.fillna(9999)
+test = test.fillna(9999)
 
 # Parse date
 train_samp = parse_dates(train_samp)
-# test = parse_dates(test)
+test = parse_dates(test)
 
 # Debug printing
-print(train_samp.columns.values)
+# print(train_samp.columns.values)
 
 """
 MLing, CV
@@ -145,10 +150,23 @@ print(np.sum(y_test == classifier.predict(X_test)) / y_test.shape[0])
 train_predict_map = percent2mapk(train_predict_prob, 5)
 y_test_list = y2list(y_test)
 print(mapk(y_test_list, train_predict_map, k=5))
+train_predict_str = list2str(train_predict_map, ' ')
 
 """
 MLing
 """
-# classifier.fit(train_samp.values, target.values)
-# test_predict_prob = classifier.predict_proba(test.values)
-# test_predict_map = percent2map(test_predict_prob, 5)
+classifier.fit(train_samp.values, target.values)
+
+# Freeing memory
+del train_samp, target, X_train, X_test, y_train, y_test, train_predict_prob, train_predict_map
+
+test_predict_prob = classifier.predict_proba(test.values)
+test_predict_map = percent2mapk(test_predict_prob, 5)
+test_predict_str = list2str(test_predict_map, ' ')
+
+"""
+Submiting
+"""
+submission = pd.DataFrame.from_csv('input/sample_submission.csv')
+submission['hotel_cluster'] = test_predict_str
+submission.to_csv('1st_sub.csv')
