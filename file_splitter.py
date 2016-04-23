@@ -62,15 +62,15 @@ n_classes = 100
 # Sampling rate of the data
 samp = 100
 # Number of rows for train
-n_rows = 1e8
+n_rows = 1e5
 # Whether to merge the data
-merge = False
+merge = True
 # sample_train filename, None if not required
 train_file = None
 # RF classifier properties
-classifier = RandomForestClassifier(n_estimators=30, max_depth=30, random_state=42, max_features=0.25)
+classifier = RandomForestClassifier(n_estimators=10, max_depth=30, random_state=42, max_features=0.25)
 # Test batch
-test_batch = 10000
+test_batch = 5000
 
 """
 Read data
@@ -183,10 +183,18 @@ del train_samp, target, X_train, X_test, y_train, y_test, train_predict_prob, tr
 test_predict_prob = np.zeros((test.shape[0], n_classes))
 for batch_i in np.arange(0, test.shape[0], test_batch):
     if (batch_i + test_batch) < test.shape[0]:
+        cur_batch = test.values[batch_i: batch_i + test_batch, :]
+        if merge:
+            cur_batch = pd.merge(cur_batch, destinations, left_on=cur_batch.srch_destination_id.values.astype(int),
+                                 right_on=destinations.index.values, how='left')
         test_predict_prob[batch_i: batch_i + test_batch,
-                          :] = classifier.predict_proba(test.values[batch_i: batch_i + test_batch, :])
+                          :] = classifier.predict_proba(cur_batch)
     else:
-        test_predict_prob[batch_i:, :] = classifier.predict_proba(test.values[batch_i:, :])
+        cur_batch = test.values[batch_i:, :]
+        if merge:
+            cur_batch = pd.merge(cur_batch, destinations, left_on=cur_batch.srch_destination_id.values.astype(int),
+                                 right_on=destinations.index.values, how='left')
+        test_predict_prob[batch_i:, :] = classifier.predict_proba(cur_batch)
 test_predict_map = percent2mapk(test_predict_prob, 5)
 test_predict_str = list2str(test_predict_map, ' ')
 
