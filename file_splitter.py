@@ -10,22 +10,22 @@ from sklearn.cross_validation import train_test_split
 
 def parse_dates(df):
     search_date = list(df['date_time'])
-    # search_date = list(map(lambda x: datetime.datetime.strptime(x, '%Y-%m-%d %H:%M:%S'), search_date))
-    # df['search_weekday'] = list(map(lambda x: int(x.strftime('%w')), search_date))
-    # df['search_month'] = list(map(lambda x: int(x.strftime('%m')), search_date))
-    # df['search_monthday'] = list(map(lambda x: int(x.strftime('%d')), search_date))
+    search_date = list(map(lambda x: datetime.datetime.strptime(x, '%Y-%m-%d %H:%M:%S'), search_date))
+    df['search_weekday'] = list(map(lambda x: int(x.strftime('%w')), search_date))
+    df['search_month'] = list(map(lambda x: int(x.strftime('%m')), search_date))
+    df['search_monthday'] = list(map(lambda x: int(x.strftime('%d')), search_date))
     del df['date_time']
     chkin_date = list(df['srch_ci'])
-    # chkin_date = list(map(lambda x: datetime.datetime.strptime(x, '%Y-%m-%d'), chkin_date))
-    # df['ci_weekday'] = list(map(lambda x: int(x.strftime('%w')), chkin_date))
-    # df['ci_month'] = list(map(lambda x: int(x.strftime('%m')), chkin_date))
-    # df['ci_monthday'] = list(map(lambda x: int(x.strftime('%d')), chkin_date))
+    chkin_date = list(map(lambda x: datetime.datetime.strptime(x, '%Y-%m-%d'), chkin_date))
+    df['ci_weekday'] = list(map(lambda x: int(x.strftime('%w')), chkin_date))
+    df['ci_month'] = list(map(lambda x: int(x.strftime('%m')), chkin_date))
+    df['ci_monthday'] = list(map(lambda x: int(x.strftime('%d')), chkin_date))
     del df['srch_ci']
     chkout_date = list(df['srch_co'])
-    # chkout_date = list(map(lambda x: datetime.datetime.strptime(x, '%Y-%m-%d'), chkout_date))
-    # df['co_weekday'] = list(map(lambda x: int(x.strftime('%w')), chkout_date))
-    # df['co_month'] = list(map(lambda x: int(x.strftime('%m')), chkout_date))
-    # df['co_monthday'] = list(map(lambda x: int(x.strftime('%d')), chkout_date))
+    chkout_date = list(map(lambda x: datetime.datetime.strptime(x, '%Y-%m-%d'), chkout_date))
+    df['co_weekday'] = list(map(lambda x: int(x.strftime('%w')), chkout_date))
+    df['co_month'] = list(map(lambda x: int(x.strftime('%m')), chkout_date))
+    df['co_monthday'] = list(map(lambda x: int(x.strftime('%d')), chkout_date))
     del df['srch_co']
     return df
 
@@ -53,6 +53,7 @@ def y2list(y_array):
     for actual in y_array:
         y_list.append([actual])
     return y_list
+
 """
 Variables
 """
@@ -65,7 +66,8 @@ n_rows = 1e5
 # Whether to merge the data
 merge = False
 # sample_train filename, None if not required
-train_file = 'input/train_samp_%d_merged.csv' % samp
+train_file = None
+# RF classifier properties
 classifier = RandomForestClassifier(n_estimators=5, max_depth=10, random_state=42)
 
 """
@@ -75,11 +77,11 @@ Read data
 destinations = pd.DataFrame.from_csv('input/destinations.csv')
 
 # Read and sample train
+print('Read the train table columns')
 train_rows = 0
 with open('input/train.csv', newline='') as csvfile:
     spamreader = csv.reader(csvfile, delimiter=',', quotechar='|')
     columns = spamreader.__next__()
-    print('Read the train table columns')
     train_samp = []
     for i, row in enumerate(spamreader):
         if i % samp == 0:
@@ -98,11 +100,13 @@ train_samp.hotel_cluster = train_samp.hotel_cluster.astype(int)
 
 # Merge if required
 if merge:
+    print('Merging')
     train_samp = pd.merge(train_samp, destinations, left_on=train_samp.srch_destination_id.values.astype(int),
                           right_on=destinations.index.values, how='left')
 
 # Export train file
 if train_file:
+    print('Saving to sampled train to file')
     train_samp.to_csv(train_file)
 
 # Separate X_train and y_train
@@ -123,10 +127,16 @@ del train_samp['user_id']
 del test['user_id']
 
 # Change NaN dates to '1970-01-01'
-train_samp[['date_time', 'srch_ci', 'srch_co']] = train_samp[['date_time',
-                                                              'srch_ci', 'srch_co']].replace('', '1970-01-01')
-test[['date_time', 'srch_ci', 'srch_co']] = test[['date_time', 'srch_ci', 'srch_co']].replace('', '1970-01-01')
-
+train_samp[['date_time', 'srch_ci', 'srch_co']] = train_samp[['date_time', 'srch_ci', 'srch_co']].astype(str)
+test[['date_time', 'srch_ci', 'srch_co']] = test[['date_time', 'srch_ci', 'srch_co']].astype(str)
+train_samp[['date_time', 'srch_ci', 'srch_co']] = train_samp[['date_time', 'srch_ci',
+                                                              'srch_co']].replace(['', 'nan', '2161-10-00'],
+                                                                                  ['1970-01-01', '1970-01-01',
+                                                                                   '1970-01-01'])
+test[['date_time', 'srch_ci', 'srch_co']] = test[['date_time', 'srch_ci',
+                                                  'srch_co']].replace(['', 'nan', '2161-10-00'], ['1970-01-01',
+                                                                                                  '1970-01-01',
+                                                                                                  '1970-01-01'])
 # Remove NaNs
 train_samp = train_samp.replace('', '9999')
 test = test.replace('', '9999')
@@ -169,4 +179,4 @@ Submiting
 """
 submission = pd.DataFrame.from_csv('input/sample_submission.csv')
 submission['hotel_cluster'] = test_predict_str
-submission.to_csv('1st_sub.csv')
+submission.to_csv('rf_sub_withdates.csv')
