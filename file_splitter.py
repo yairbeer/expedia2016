@@ -62,13 +62,13 @@ n_classes = 100
 # Sampling rate of the data
 samp = 100
 # Number of rows for train
-n_rows = 1e4
+n_rows = 1e8
 # Whether to merge the data
 merge = False
 # sample_train filename, None if not required
 train_file = None
 # RF classifier properties
-classifier = RandomForestClassifier(n_estimators=25, max_depth=40, random_state=42)
+classifier = RandomForestClassifier(n_estimators=30, max_depth=30, random_state=42, max_features=0.25)
 # Test batch
 test_batch = 10000
 
@@ -166,7 +166,6 @@ for batch_i in np.arange(0, X_test.shape[0], test_batch):
             classifier.predict_proba(X_test[batch_i: batch_i + test_batch, :])
     else:
         train_predict_prob[batch_i:, :] = classifier.predict_proba(X_test[batch_i:, :])
-train_predict_prob = percent2mapk(train_predict_prob, 5)
 train_predict_map = percent2mapk(train_predict_prob, 5)
 y_test_list = y2list(y_test)
 print('The mean average precision is %.4f' % mapk(y_test_list, train_predict_map, k=5))
