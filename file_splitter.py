@@ -183,18 +183,18 @@ del train_samp, target, X_train, X_test, y_train, y_test, train_predict_prob, tr
 test_predict_prob = np.zeros((test.shape[0], n_classes))
 for batch_i in np.arange(0, test.shape[0], test_batch):
     if (batch_i + test_batch) < test.shape[0]:
-        cur_batch = test.values[batch_i: batch_i + test_batch, :]
+        cur_batch = test.iloc[batch_i: batch_i + test_batch, :]
         if merge:
             cur_batch = pd.merge(cur_batch, destinations, left_on=cur_batch.srch_destination_id.values.astype(int),
                                  right_on=destinations.index.values, how='left')
         test_predict_prob[batch_i: batch_i + test_batch,
-                          :] = classifier.predict_proba(cur_batch)
+                          :] = classifier.predict_proba(cur_batch.values)
     else:
-        cur_batch = test.values[batch_i:, :]
+        cur_batch = test.iloc[batch_i:, :]
         if merge:
             cur_batch = pd.merge(cur_batch, destinations, left_on=cur_batch.srch_destination_id.values.astype(int),
                                  right_on=destinations.index.values, how='left')
-        test_predict_prob[batch_i:, :] = classifier.predict_proba(cur_batch)
+        test_predict_prob[batch_i:, :] = classifier.predict_proba(cur_batch.values)
 test_predict_map = percent2mapk(test_predict_prob, 5)
 test_predict_str = list2str(test_predict_map, ' ')
 
