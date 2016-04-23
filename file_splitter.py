@@ -62,13 +62,15 @@ n_classes = 100
 # Sampling rate of the data
 samp = 100
 # Number of rows for train
-n_rows = 1e5
+n_rows = 1e4
 # Whether to merge the data
 merge = False
 # sample_train filename, None if not required
 train_file = None
 # RF classifier properties
-classifier = RandomForestClassifier(n_estimators=5, max_depth=10, random_state=42)
+classifier = RandomForestClassifier(n_estimators=25, max_depth=40, random_state=42)
+# Test batch
+test_batch = 10000
 
 """
 Read data
@@ -123,6 +125,7 @@ test = pd.read_csv('input/test.csv', index_col=0)
 """
 Feature engineering
 """
+print('Feature engineering')
 del train_samp['user_id']
 del test['user_id']
 
@@ -153,29 +156,43 @@ test = parse_dates(test)
 """
 MLing, CV
 """
+print('CV')
 X_train, X_test, y_train, y_test = train_test_split(train_samp.values, target.values, test_size=0.33, random_state=42)
 classifier.fit(X_train, y_train)
-train_predict_prob = classifier.predict_proba(X_test)
-print(np.sum(y_test == classifier.predict(X_test)) / y_test.shape[0])
+train_predict_prob = np.zeros((X_test.shape[0], n_classes))
+for batch_i in np.arange(0, X_test.shape[0], test_batch):
+    if (batch_i + test_batch) < X_test.shape[0]:
+        train_predict_prob[batch_i: batch_i + test_batch, :] = \
+            classifier.predict_proba(X_test[batch_i: batch_i + test_batch, :])
+    else:
+        train_predict_prob[batch_i:, :] = classifier.predict_proba(X_test[batch_i:, :])
+train_predict_prob = percent2mapk(train_predict_prob, 5)
 train_predict_map = percent2mapk(train_predict_prob, 5)
 y_test_list = y2list(y_test)
-print(mapk(y_test_list, train_predict_map, k=5))
+print('The mean average precision is %.4f' % mapk(y_test_list, train_predict_map, k=5))
 train_predict_str = list2str(train_predict_map, ' ')
 
 """
 MLing
 """
+print('Batch predicting test')
 classifier.fit(train_samp.values, target.values)
 
 # Freeing memory
 del train_samp, target, X_train, X_test, y_train, y_test, train_predict_prob, train_predict_map
 
-test_predict_prob = classifier.predict_proba(test.values)
+test_predict_prob = np.zeros((test.shape[0], n_classes))
+for batch_i in np.arange(0, test.shape[0], test_batch):
+    if (batch_i + test_batch) < test.shape[0]:
+        test_predict_prob[batch_i: batch_i + test_batch,
+                          :] = classifier.predict_proba(test.values[batch_i: batch_i + test_batch, :])
+    else:
+        test_predict_prob[batch_i:, :] = classifier.predict_proba(test.values[batch_i:, :])
 test_predict_map = percent2mapk(test_predict_prob, 5)
 test_predict_str = list2str(test_predict_map, ' ')
 
 """
-Submiting
+Submitting
 """
 submission = pd.DataFrame.from_csv('input/sample_submission.csv')
 submission['hotel_cluster'] = test_predict_str
