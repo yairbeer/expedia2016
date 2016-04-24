@@ -64,11 +64,11 @@ samp = 100
 # Number of rows for train
 n_rows = 1e8
 # Whether to merge the data
-merge = False
+merge = True
 # sample_train filename, None if not required
 train_file = None
 # RF classifier properties
-classifier = RandomForestClassifier(n_estimators=31, max_depth=30, random_state=42, max_features=0.25)
+classifier = RandomForestClassifier(n_estimators=23, max_depth=30, random_state=42, max_features=0.25)
 # Test batch
 test_batch = 5000
 
@@ -150,7 +150,9 @@ test = test.fillna(-10)
 
 # Parse date
 train_samp = parse_dates(train_samp)
+train_samp = train_samp.astype('float32')
 test = parse_dates(test)
+test = test.astype('float32')
 
 # Debug printing
 # print(train_samp.columns.values)
