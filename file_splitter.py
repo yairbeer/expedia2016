@@ -68,7 +68,7 @@ merge = True
 # sample_train filename, None if not required
 train_file = None
 # RF classifier properties
-classifier = RandomForestClassifier(n_estimators=10, max_depth=30, random_state=42, max_features=0.25)
+classifier = RandomForestClassifier(n_estimators=11, max_depth=30, random_state=42, max_features=0.25)
 # Test batch
 test_batch = 5000
 
@@ -187,8 +187,8 @@ for batch_i in np.arange(0, test.shape[0], test_batch):
         if merge:
             cur_batch = pd.merge(cur_batch, destinations, left_on=cur_batch.srch_destination_id.values.astype(int),
                                  right_on=destinations.index.values, how='left')
-        test_predict_prob[batch_i: batch_i + test_batch,
-                          :] = classifier.predict_proba(cur_batch.values)
+            print(cur_batch)
+        test_predict_prob[batch_i: batch_i + test_batch, :] = classifier.predict_proba(cur_batch.values)
     else:
         cur_batch = test.iloc[batch_i:, :]
         if merge:
