@@ -62,13 +62,13 @@ n_classes = 100
 # Sampling rate of the data
 samp = 100
 # Number of rows for train
-n_rows = 1e5
+n_rows = 1e8
 # Whether to merge the data
-merge = True
+merge = False
 # sample_train filename, None if not required
 train_file = None
 # RF classifier properties
-classifier = RandomForestClassifier(n_estimators=11, max_depth=30, random_state=42, max_features=0.25)
+classifier = RandomForestClassifier(n_estimators=31, max_depth=30, random_state=42, max_features=0.25)
 # Test batch
 test_batch = 5000
 
@@ -85,7 +85,8 @@ with open('input/train.csv', newline='') as csvfile:
     spamreader = csv.reader(csvfile, delimiter=',', quotechar='|')
     columns = spamreader.__next__()
     train_samp = []
-    for i, row in enumerate(spamreader):
+    i = 0
+    for row in spamreader:
         if i % samp == 0:
             train_samp.append(row)
             train_rows += 1
@@ -93,6 +94,7 @@ with open('input/train.csv', newline='') as csvfile:
                 break
         if i % 1e6 == 0:
             print(i)
+        i += 1
 csvfile.close()
 
 # build pandas Dataframe
@@ -141,10 +143,10 @@ test[['date_time', 'srch_ci', 'srch_co']] = test[['date_time', 'srch_ci',
                                                                                                   '1970-01-01',
                                                                                                   '1970-01-01'])
 # Remove NaNs
-train_samp = train_samp.replace('', '9999')
-test = test.replace('', '9999')
-train_samp = train_samp.fillna(9999)
-test = test.fillna(9999)
+train_samp = train_samp.replace('', '-10')
+test = test.replace('', '-10')
+train_samp = train_samp.fillna(-10)
+test = test.fillna(-10)
 
 # Parse date
 train_samp = parse_dates(train_samp)
@@ -180,20 +182,17 @@ classifier.fit(train_samp.values, target.values)
 # Freeing memory
 del train_samp, target, X_train, X_test, y_train, y_test, train_predict_prob, train_predict_map
 
+if merge:
+    test = pd.merge(test, destinations, left_on=test.srch_destination_id.values.astype(int),
+                    right_on=destinations.index.values, how='left')
+    test = test.fillna(-10)
 test_predict_prob = np.zeros((test.shape[0], n_classes))
 for batch_i in np.arange(0, test.shape[0], test_batch):
     if (batch_i + test_batch) < test.shape[0]:
         cur_batch = test.iloc[batch_i: batch_i + test_batch, :]
-        if merge:
-            cur_batch = pd.merge(cur_batch, destinations, left_on=cur_batch.srch_destination_id.values.astype(int),
-                                 right_on=destinations.index.values, how='left')
-            print(cur_batch)
         test_predict_prob[batch_i: batch_i + test_batch, :] = classifier.predict_proba(cur_batch.values)
     else:
         cur_batch = test.iloc[batch_i:, :]
-        if merge:
-            cur_batch = pd.merge(cur_batch, destinations, left_on=cur_batch.srch_destination_id.values.astype(int),
-                                 right_on=destinations.index.values, how='left')
         test_predict_prob[batch_i:, :] = classifier.predict_proba(cur_batch.values)
 test_predict_map = percent2mapk(test_predict_prob, 5)
 test_predict_str = list2str(test_predict_map, ' ')
@@ -203,4 +202,4 @@ Submitting
 """
 submission = pd.DataFrame.from_csv('input/sample_submission.csv')
 submission['hotel_cluster'] = test_predict_str
-submission.to_csv('rf_sub_withdates.csv')
+submission.to_csv('rf_sub_withdates_merged.csv')
